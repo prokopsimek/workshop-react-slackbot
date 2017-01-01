@@ -1,96 +1,144 @@
 import React, { Component } from 'react';
 import logo from './logo.svg';
 import './App.css';
+import Title from './Title';
 
-const SecondComponent = (props) => {
-  return(
-    <div>{props.greetings}</div>
-    );
-}
 
-const Title = () => {
+
+const TodoForm = ({inputVal, onInputChange, onFormSubmit, priorityVal, onPriorityChange}) => {
   return (
     <div>
-       <div>
-          <h1>to-do</h1>
-       </div>
+      <form onSubmit={onFormSubmit}>
+        <input type="text" value={inputVal} onChange={onInputChange} />
+        <select value={priorityVal} onChange={onPriorityChange} >
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+        </select>
+        <button type="submit" disabled={!inputVal}>Add TODO</button>
+      </form>
     </div>
-  );
+  )
 }
 
-const TodoForm = ({addTodo}) => {
-  // Input tracker
-  let input;
 
+
+const TodoList = ({data, destroyTodo}) => {
   return (
     <div>
-      <input ref={node => {
-        input = node;
-      }} />
-      <button onClick={() => {
-        addTodo(input.value);
-        input.value = '';
-      }}>
-        +
-      </button>
+      {data.map((item, index) => {
+        return(
+          <div key={index}>{item.id} - {item.value} (prio: {item.pvalue}) <button onClick={() => destroyTodo(item.id)}>X</button></div>
+        )
+      }
+    )}
     </div>
-  );
-};
-
-const Todo = ({todo, remove}) => {
-  // Each Todo
-  return (<li onClick={() => {remove(todo.id)}}> {todo.text}</li>);
+  )
 }
 
-const TodoList = ({todos, remove}) => {
-  // Map through the todos
-  const todoNode = todos.map((todo) => {
-    return (<Todo todo={todo} key={todo.id} remove={remove}/>)
-  });
-  return (<ul>{todoNode}</ul>);
-}
 
-// Contaner Component
-// Todo Id
-window.id = 0;
+
+
 class App extends React.Component{
   constructor(props){
     // Pass props to parent class
     super(props);
     // Set initial state
     this.state = {
-      data: []
+      data: [],
+      inputVal: "",
+      priorityVal: "1",
+      lastTodoId: 0,
+      sortOrd: "asc"
     }
   }
-  // Add todo handler
-  addTodo(val){
-    // Assemble data
-    const todo = {text: val, id: window.id++}
-    // Update data
-    this.state.data.push(todo);
-    // Update state
-    this.setState({data: this.state.data});
+
+  componentDidMount = () => {
+    const savedTodos = JSON.parse(localStorage.getItem("todocka"));
+
+    if (savedTodos) {
+      this.setState({
+        data: savedTodos
+      })
+    }
+
+    window.onbeforeunload = this.saveIt
   }
-  // Handle remove
-  handleRemove(id){
-    // Filter all todos except the one to be removed
-    const remainder = this.state.data.filter((todo) => {
-      if(todo.id !== id) return todo;
-    });
-    // Update state with filter
-    this.setState({data: remainder});
+
+  ///////////// nefunguje pri refreshi
+  // componentWillUnmount = () => {
+  //   localStorage.setItem("todocka", JSON.stringify(this.state.data))
+  // }
+
+  saveIt = () => {
+    localStorage.setItem("todocka", JSON.stringify(this.state.data))
+  }
+
+  togglPrioSort = () => {
+    const {sortOrd} = this.state;
+
+    this.setState({
+      sortOrd: sortOrd === "asc" ? "desc" : "asc"
+    })
+  }
+
+  onInputChange = (event) => {
+    this.setState({
+      inputVal: event.target.value
+    })
+  }
+
+  onPriorityChange = (event) => {
+    this.setState({
+      priorityVal: event.target.value
+    })
+  }
+
+  onFormSubmit = (event) => {
+    const {data, lastTodoId, inputVal, priorityVal} = this.state;
+    const newId = Math.max(...data.map(item => item.id), 0) + 1;
+    event.preventDefault();
+
+    this.setState({
+      data: [...data, { id: newId, value: inputVal, pvalue: priorityVal }],
+      inputVal: "",
+      priorityVal: "1",
+      lastTodoId: newId
+    })
+  }
+
+  destroyTodo = (itemId) => {
+    const {data} = this.state;
+
+    this.setState({
+      data: data.filter((item) => {
+        return item.id !== itemId
+      })
+    })
   }
 
   render(){
     // Render JSX
+    const {inputVal, priorityVal, sortOrd, data} = this.state;
+    console.log('data', data)
+    const sortedData = [...data].sort((a, b) => {
+      if(a.pvalue === b.pvalue){
+        return 0
+      }
+      if(sortOrd === "asc"){
+        return a.pvalue > b.pvalue ? -1 : 1
+      } else {
+        return a.pvalue < b.pvalue ? -1 : 1
+      }
+    })
     return (
       <div>
         <Title />
-        <TodoForm addTodo={this.addTodo.bind(this)}/>
-        <TodoList
-          todos={this.state.data}
-          remove={this.handleRemove.bind(this)}
-        />
+        <TodoForm inputVal={inputVal} onInputChange={this.onInputChange} onFormSubmit={this.onFormSubmit} priorityVal={priorityVal} onPriorityChange={this.onPriorityChange} />
+        <TodoList data={sortedData} destroyTodo={this.destroyTodo} />
+
+        <button onClick={this.saveIt}>Save shit</button>
+        <button onClick={this.togglPrioSort}>Sort by Priority</button>
       </div>
     );
   }
